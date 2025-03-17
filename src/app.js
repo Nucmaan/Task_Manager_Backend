@@ -39,9 +39,12 @@ app.use("/public", express.static("public"));
 
 const authRoutes = require("./Routes/User.js");
 const projectRoutes = require("./Routes/Project.js");
+const taskRoutes = require("./Routes/Task.js");
+const taskAssignment = require("./Routes/Task_Assignments.js");
 
 app.use("/api/auth/", authRoutes);
 app.use("/api/project/", projectRoutes);
-
+app.use("/api/task/", taskRoutes);
+app.use("/api/task-assignment/", taskAssignment);
 
 module.exports = app;
