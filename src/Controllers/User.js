@@ -82,7 +82,7 @@ const logoutUser = async (req, res) => {
  const getUsers = async (req, res) => {
   try {
     const users = await db.any(
-      "SELECT id, name, email, role, created_at FROM users"
+      "SELECT id, name, email, role, profile_image, created_at FROM users"
     );
     res.status(200).json({
       message: "All Users",
@@ -113,8 +113,7 @@ const getSingleUser = async (req, res) => {
     }
   };
   
-  // ✅ Delete User by ID
-  const deleteUser = async (req, res) => {
+   const deleteUser = async (req, res) => {
     try {
       const { id } = req.params;
   
@@ -132,7 +131,66 @@ const getSingleUser = async (req, res) => {
       res.status(500).json({ error: "An error occurred" });
     }
   };
-  
+
+  const updateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, email, role } = req.body;
+        let profileImage = null;
+
+         const validRoles = ['Admin', 'Translator', 'Supervisor', 'Voice-over Artist', 'Sound Engineer', 'Editor'];
+        
+        if (role && !validRoles.includes(role)) {
+            return res.status(400).json({ message: "Invalid role provided" });
+        }
+
+        if (req.file) {
+            profileImage = `${process.env.BASE_URL}/public/${req.file.filename}`;
+        }
+
+         const user = await db.oneOrNone("SELECT * FROM users WHERE id = $1", [id]);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        let updateFields = [];
+        let updateValues = [];
+
+        if (name) {
+            updateFields.push("name = $" + (updateFields.length + 1));
+            updateValues.push(name);
+        }
+
+        if (email) {
+            updateFields.push("email = $" + (updateFields.length + 1));
+            updateValues.push(email);
+        }
+
+        if (profileImage) {
+            updateFields.push("profile_image = $" + (updateFields.length + 1));
+            updateValues.push(profileImage);
+        }
+
+        if (role) {
+            updateFields.push("role = $" + (updateFields.length + 1));
+            updateValues.push(role);
+        }
+
+        if (updateFields.length === 0) {
+            return res.status(400).json({ message: "No fields to update" });
+        }
+
+        updateValues.push(id);
+
+        await db.none(`UPDATE users SET ${updateFields.join(", ")} WHERE id = $${updateValues.length}`, updateValues);
+
+        res.status(200).json({ message: "User updated successfully" });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "An error occurred while updating the user" });
+    }
+};
 
  const forgetPassword = async (req, res) => {
   try {
@@ -206,5 +264,6 @@ module.exports = {
   resetPassword,
   getSingleUser,
   deleteUser,
-  logoutUser
+  logoutUser,
+  updateUser
 };

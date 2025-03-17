@@ -11,7 +11,12 @@ const path = require("path");
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ["audio/mpeg", "audio/wav", "video/mp4", "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/jpg",
+    "image/gif",
+  ];
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -21,4 +26,6 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({ storage, fileFilter });
 
-module.exports = upload;
+module.exports = {
+  upload
+};

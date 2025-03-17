@@ -32,11 +32,16 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+app.use("/public", express.static("public"));
+
 
 const authRoutes = require("./Routes/User.js");
+const projectRoutes = require("./Routes/Project.js");
 
 app.use("/api/auth/", authRoutes);
-
+app.use("/api/project/", projectRoutes);
 
 
 module.exports = app;
