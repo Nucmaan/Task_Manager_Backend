@@ -41,10 +41,13 @@ const authRoutes = require("./Routes/User.js");
 const projectRoutes = require("./Routes/Project.js");
 const taskRoutes = require("./Routes/Task.js");
 const taskAssignment = require("./Routes/Task_Assignments.js");
+const projectChat = require("./Routes/ChatProject.js");
 
 app.use("/api/auth/", authRoutes);
 app.use("/api/project/", projectRoutes);
 app.use("/api/task/", taskRoutes);
 app.use("/api/task-assignment/", taskAssignment);
+app.use("/api/project-chat/", projectChat);
+
 
 module.exports = app;
