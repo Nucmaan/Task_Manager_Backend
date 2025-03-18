@@ -1,269 +1,100 @@
-const UserDb = require("../Database/UserDb.js");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
-const sendResetLink = require("../utills/sendEmail.js");
+const UserService = require("../services/UserService.js");
 
- const registerUser = async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-
-     const existingUser = await UserDb.oneOrNone(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
-    if (existingUser)
-      return res.status(400).json({ message: "User already exists" });
-
-     const hashedPassword = await bcrypt.hash(password, 10);
-
-     const user = await UserDb.one(
-      "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
-      [name, email, hashedPassword]
-    );
-
-    res.status(201).json({ message: "User registered successfully", user });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "An error occurred" });
-  }
-};
-
- const loginUser = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const user = await UserDb.oneOrNone("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
-
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
+const registerUser = async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+        const user = await UserService.registerUser(name, email, password);
+        res.status(201).json({ message: "User registered successfully", user });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
+};
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
+const loginUser = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const { token, user } = await UserService.loginUser(email, password);
+
+        res.status(200)
+            .cookie("token", token, { expires: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), httpOnly: true })
+            .json({ message: "User logged in successfully", token, user });
+
+    } catch (error) {
+        res.status(401).json({ error: error.message });
     }
-
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "5h" }
-    );
-
-    const options = {
-      expires: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-      httpOnly: true,
-    };
-
-    res.status(200).cookie("token", token, options).json({ message: "User logged in successfully",token, user });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "An error occurred" });
-  }
 };
 
-const logoutUser = async (req, res) => {
-  try {
-    res.clearCookie("token", {
-      httpOnly: true,
-      sameSite: "strict",
-    });
-
-    res.status(200).json({ message: "User logged out successfully" });
-  } catch (error) {
-    console.error("Logout Error:", error);
-    res.status(500).json({ error: "An error occurred while logging out" });
-  }
-};
-
- const getUsers = async (req, res) => {
-  try {
-    const users = await UserDb.any(
-      "SELECT id, name, email, role, profile_image, created_at FROM users"
-    );
-    res.status(200).json({
-      message: "All Users",
-      users,
-    });
-  } catch (error) {
-    res.status(500).json({ error: "An error occurred" });
-  }
+const getUsers = async (req, res) => {
+    try {
+        const users = await UserService.getUsers();
+        res.status(200).json({ message: "All Users", users });
+    } catch (error) {
+        res.status(500).json({ error: "An error occurred" });
+    }
 };
 
 const getSingleUser = async (req, res) => {
     try {
-      const { id } = req.params;
-  
-      const user = await UserDb.oneOrNone(
-        "SELECT id, name, email, role, created_at FROM users WHERE id = $1",
-        [id]
-      );
-  
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-  
-      res.status(201).json({ message: "Uer details", user });
+        const user = await UserService.getSingleUser(req.params.id);
+        res.status(200).json({ message: "User details", user });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "An error occurred" });
+        res.status(404).json({ error: error.message });
     }
-  };
-  
-   const deleteUser = async (req, res) => {
+};
+
+const deleteUser = async (req, res) => {
     try {
-      const { id } = req.params;
-  
-      const user = await UserDb.oneOrNone("SELECT * FROM users WHERE id = $1", [id]);
-  
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-  
-      await UserDb.none("DELETE FROM users WHERE id = $1", [id]);
-  
-      res.status(201).json({ message: "User deleted successfully" });
+        await UserService.deleteUser(req.params.id);
+        res.status(200).json({ message: "User deleted successfully" });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "An error occurred" });
+        res.status(404).json({ error: error.message });
     }
-  };
+};
 
-  const updateUser = async (req, res) => {
+const updateUser = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { name, email, role } = req.body;
-        let profileImage = null;
-
-         const validRoles = ['Admin', 'Translator', 'Supervisor', 'Voice-over Artist', 'Sound Engineer', 'Editor'];
-        
-        if (role && !validRoles.includes(role)) {
-            return res.status(400).json({ message: "Invalid role provided" });
-        }
-
-        if (req.file) {
-            profileImage = `${process.env.BASE_URL}/public/${req.file.filename}`;
-        }
-
-         const user = await UserDb.oneOrNone("SELECT * FROM users WHERE id = $1", [id]);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        let updateFields = [];
-        let updateValues = [];
-
-        if (name) {
-            updateFields.push("name = $" + (updateFields.length + 1));
-            updateValues.push(name);
-        }
-
-        if (email) {
-            updateFields.push("email = $" + (updateFields.length + 1));
-            updateValues.push(email);
-        }
-
-        if (profileImage) {
-            updateFields.push("profile_image = $" + (updateFields.length + 1));
-            updateValues.push(profileImage);
-        }
-
-        if (role) {
-            updateFields.push("role = $" + (updateFields.length + 1));
-            updateValues.push(role);
-        }
-
-        if (updateFields.length === 0) {
-            return res.status(400).json({ message: "No fields to update" });
-        }
-
-        updateValues.push(id);
-
-        await UserDb.none(`UPDATE users SET ${updateFields.join(", ")} WHERE id = $${updateValues.length}`, updateValues);
-
+        await UserService.updateUser(req.params.id, req.body);
         res.status(200).json({ message: "User updated successfully" });
-
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "An error occurred while updating the user" });
+        res.status(400).json({ error: error.message });
     }
 };
 
- const forgetPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-    const user = await UserDb.oneOrNone("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+const forgetPassword = async (req, res) => {
+    try {
+        await UserService.forgetPassword(req.body.email);
+        res.status(200).json({ message: "Reset link sent to your email successfully!" });
+    } catch (error) {
+        res.status(404).json({ error: error.message });
     }
-
-     const resetToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = await bcrypt.hash(resetToken, 10);
-
-     await UserDb.none(
-      "UPDATE users SET reset_token = $1, reset_token_expires = NOW() + INTERVAL '1 hour' WHERE email = $2",
-      [hashedToken, email]
-    );
-
-    const emailResponse = await sendResetLink(resetToken, email);
-
-    if (emailResponse.success) {
-      return res.status(200).json({ message: "Reset link sent to Yur Email successfully!" });
-    } else {
-      return res.status(500).json({ message: "Failed to send reset link" });
-    }
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "An error occurred" });
-  }
 };
 
- const resetPassword = async (req, res) => {
-  try {
-    const { email, token, newPassword } = req.body;
-    const user = await UserDb.oneOrNone(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
-
-    if (!user || !user.reset_token) {
-      return res.status(400).json({ message: "Invalid or expired token" });
+const resetPassword = async (req, res) => {
+    try {
+        await UserService.resetPassword(req.body.email, req.body.token, req.body.newPassword);
+        res.status(200).json({ message: "Password reset successful" });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
+};
 
-     const isValidToken = await bcrypt.compare(token, user.reset_token);
-    if (!isValidToken) {
-      return res.status(400).json({ message: "Invalid or expired token" });
+const logoutUser = async (req, res) => {
+    try {
+        res.clearCookie("token", { httpOnly: true, sameSite: "strict" });
+        res.status(200).json({ message: "User logged out successfully" });
+    } catch (error) {
+        res.status(500).json({ error: "An error occurred while logging out" });
     }
-
-     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-     await UserDb.none(
-      "UPDATE users SET password = $1, reset_token = NULL, reset_token_expires = NULL WHERE email = $2",
-      [hashedPassword, email]
-    );
-
-    res.status(200).json({ message: "Password reset successful" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "An error occurred" });
-  }
 };
 
 module.exports = {
-  registerUser,
-  loginUser,
-  getUsers,
-  forgetPassword,
-  resetPassword,
-  getSingleUser,
-  deleteUser,
-  logoutUser,
-  updateUser
+    registerUser,
+    loginUser,
+    getUsers,
+    getSingleUser,
+    deleteUser,
+    updateUser,
+    forgetPassword,
+    resetPassword,
+    logoutUser
 };
