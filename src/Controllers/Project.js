@@ -1,4 +1,5 @@
-const db = require("../Database/database.js");
+const TaskDb = require("../Database/TaskDb.js");
+
 const fs = require("fs");
 const path = require("path");
 
@@ -8,7 +9,7 @@ const createProject = async (req, res) => {
         //const project_image = req.file ? req.file.path : null;
         const project_image = req.file ? `${process.env.BASE_URL}/public/${req.file.filename}` : null;
 
-        const project = await db.one(
+        const project = await TaskDb.one(
             `INSERT INTO projects (name, description, deadline, created_by, status, project_image, priority, progress) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
             [
@@ -31,7 +32,7 @@ const createProject = async (req, res) => {
 
 const getAllProjects = async (req, res) => {
     try {
-        const projects = await db.any(
+        const projects = await TaskDb.any(
             `SELECT p.id, p.name, p.description, p.deadline, p.status, p.priority, p.progress, p.project_image, p.created_at, p.updated_at, 
                     u.id AS creator_id, u.name AS creator_name, u.email AS creator_email, u.role AS creator_role, u.profile_image AS creator_profile_image
              FROM projects p
@@ -47,7 +48,7 @@ const getSingleProject = async (req, res) => {
     try {
         const { id } = req.params; 
 
-        const project = await db.oneOrNone(
+        const project = await TaskDb.oneOrNone(
             `SELECT p.id, p.name, p.description, p.deadline, p.status, p.priority, p.progress, p.project_image, p.created_at, p.updated_at,
                     u.id AS creator_id, u.name AS creator_name, u.email AS creator_email, u.role AS creator_role, u.profile_image AS creator_profile_image
              FROM projects p
@@ -70,7 +71,7 @@ const deleteProject = async (req, res) => {
     try {
         const { id } = req.params; 
 
-        const deletedProject = await db.result(
+        const deletedProject = await TaskDb.result(
             `DELETE FROM projects WHERE id = $1 RETURNING *`,
             [id]
         );
@@ -96,7 +97,7 @@ const updateProject = async (req, res) => {
             project_image = `${process.env.BASE_URL}/public/${req.file.filename}`;
         }
 
-         const currentProject = await db.oneOrNone(
+         const currentProject = await TaskDb.oneOrNone(
             `SELECT project_image FROM projects WHERE id = $1`,
             [id]
         );
@@ -154,7 +155,7 @@ const updateProject = async (req, res) => {
          updateQuery += setClause.join(", ") + ` WHERE id = $${queryParams.length + 1} RETURNING *`;
         queryParams.push(id);
 
-         const updatedProject = await db.one(updateQuery, queryParams);
+         const updatedProject = await TaskDb.one(updateQuery, queryParams);
 
         res.status(200).json({
             success: true,

@@ -1,4 +1,4 @@
-const db = require("../Database/database.js");
+const UserDb = require("../Database/UserDb.js");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
@@ -8,7 +8,7 @@ const sendResetLink = require("../utills/sendEmail.js");
   try {
     const { name, email, password } = req.body;
 
-     const existingUser = await db.oneOrNone(
+     const existingUser = await UserDb.oneOrNone(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
@@ -17,7 +17,7 @@ const sendResetLink = require("../utills/sendEmail.js");
 
      const hashedPassword = await bcrypt.hash(password, 10);
 
-     const user = await db.one(
+     const user = await UserDb.one(
       "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
       [name, email, hashedPassword]
     );
@@ -33,7 +33,7 @@ const sendResetLink = require("../utills/sendEmail.js");
   try {
     const { email, password } = req.body;
 
-    const user = await db.oneOrNone("SELECT * FROM users WHERE email = $1", [
+    const user = await UserDb.oneOrNone("SELECT * FROM users WHERE email = $1", [
       email,
     ]);
 
@@ -81,7 +81,7 @@ const logoutUser = async (req, res) => {
 
  const getUsers = async (req, res) => {
   try {
-    const users = await db.any(
+    const users = await UserDb.any(
       "SELECT id, name, email, role, profile_image, created_at FROM users"
     );
     res.status(200).json({
@@ -97,7 +97,7 @@ const getSingleUser = async (req, res) => {
     try {
       const { id } = req.params;
   
-      const user = await db.oneOrNone(
+      const user = await UserDb.oneOrNone(
         "SELECT id, name, email, role, created_at FROM users WHERE id = $1",
         [id]
       );
@@ -117,13 +117,13 @@ const getSingleUser = async (req, res) => {
     try {
       const { id } = req.params;
   
-      const user = await db.oneOrNone("SELECT * FROM users WHERE id = $1", [id]);
+      const user = await UserDb.oneOrNone("SELECT * FROM users WHERE id = $1", [id]);
   
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
   
-      await db.none("DELETE FROM users WHERE id = $1", [id]);
+      await UserDb.none("DELETE FROM users WHERE id = $1", [id]);
   
       res.status(201).json({ message: "User deleted successfully" });
     } catch (error) {
@@ -148,7 +148,7 @@ const getSingleUser = async (req, res) => {
             profileImage = `${process.env.BASE_URL}/public/${req.file.filename}`;
         }
 
-         const user = await db.oneOrNone("SELECT * FROM users WHERE id = $1", [id]);
+         const user = await UserDb.oneOrNone("SELECT * FROM users WHERE id = $1", [id]);
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -182,7 +182,7 @@ const getSingleUser = async (req, res) => {
 
         updateValues.push(id);
 
-        await db.none(`UPDATE users SET ${updateFields.join(", ")} WHERE id = $${updateValues.length}`, updateValues);
+        await UserDb.none(`UPDATE users SET ${updateFields.join(", ")} WHERE id = $${updateValues.length}`, updateValues);
 
         res.status(200).json({ message: "User updated successfully" });
 
@@ -195,7 +195,7 @@ const getSingleUser = async (req, res) => {
  const forgetPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await db.oneOrNone("SELECT * FROM users WHERE email = $1", [
+    const user = await UserDb.oneOrNone("SELECT * FROM users WHERE email = $1", [
       email,
     ]);
 
@@ -206,7 +206,7 @@ const getSingleUser = async (req, res) => {
      const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = await bcrypt.hash(resetToken, 10);
 
-     await db.none(
+     await UserDb.none(
       "UPDATE users SET reset_token = $1, reset_token_expires = NOW() + INTERVAL '1 hour' WHERE email = $2",
       [hashedToken, email]
     );
@@ -228,7 +228,7 @@ const getSingleUser = async (req, res) => {
  const resetPassword = async (req, res) => {
   try {
     const { email, token, newPassword } = req.body;
-    const user = await db.oneOrNone(
+    const user = await UserDb.oneOrNone(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
@@ -244,7 +244,7 @@ const getSingleUser = async (req, res) => {
 
      const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-     await db.none(
+     await UserDb.none(
       "UPDATE users SET password = $1, reset_token = NULL, reset_token_expires = NULL WHERE email = $2",
       [hashedPassword, email]
     );

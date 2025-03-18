@@ -10,12 +10,10 @@ Router.put('/assign/:task_id/:user_id', updateAssignedTask);
 
 Router.get('/userAssignments/:user_id',getUserAssignments);
 
-Router.post('/task_status/update', createTaskStatusUpdate);
 
 Router.put('/task_status_update/:status_update_id',editTaskStatusUpdate);
 Router.get('/findMyTaskStatusUpdate/:user_id',getUserTaskStatusUpdates);
 Router.get('/allTaskStatusUpdates',getAllTaskStatusUpdates);
-
 Router.put('/submitTask/:task_id',upload.single('file_url'),submitTheTask);
 
 module.exports = Router;

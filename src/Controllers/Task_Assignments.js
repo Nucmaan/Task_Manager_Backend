@@ -1,46 +1,13 @@
-const db = require('../Database/database.js');
 const fs = require("fs");
 const path = require("path");
 
-const createTaskAssignment = async (req, res) => {
-    try {
-        const { task_id, user_id } = req.body;
-
-         const task = await db.oneOrNone('SELECT * FROM tasks WHERE id = $1', [task_id]);
-        if (!task) {
-            return res.status(404).json({ success: false, message: 'Task not found' });
-        }
-
-         const user = await db.oneOrNone('SELECT * FROM users WHERE id = $1', [user_id]);
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
-
-         const newAssignment = await db.one(
-            `INSERT INTO task_assignments (task_id, user_id) 
-            VALUES ($1, $2) RETURNING *`,
-            [task_id, user_id]
-        );
-
-        //creating default task_assignment_update for tracking 
-        const status = 'To Do';
-        await db.one(
-            `INSERT INTO task_status_updates (task_id, updated_by, status) 
-             VALUES ($1, $2, $3) RETURNING *`,
-            [task_id, user_id, status]
-        );
-
-        res.status(201).json({ success: true, message: 'Task assigned successfully', assignment: newAssignment });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error assigning task', error: error.message });
-    }
-};
+const TaskDb = require("../Database/TaskDb.js");
 
 const getSingleAssignedTask = async (req, res) => {
     try {
         const { task_id, user_id } = req.params;
 
-        const assignment = await db.oneOrNone(
+        const assignment = await TaskDb.oneOrNone(
             `SELECT * FROM task_assignments WHERE task_id = $1 AND user_id = $2`,
             [task_id, user_id]
         );
@@ -59,7 +26,7 @@ const deleteAssignedTask = async (req, res) => {
     try {
         const { task_id, user_id } = req.params;
 
-         const assignment = await db.oneOrNone(
+         const assignment = await TaskDb.oneOrNone(
             `SELECT * FROM task_assignments WHERE task_id = $1 AND user_id = $2`,
             [task_id, user_id]
         );
@@ -68,7 +35,7 @@ const deleteAssignedTask = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Assignment not found' });
         }
 
-        await db.none(
+        await TaskDb.none(
             `DELETE FROM task_assignments WHERE task_id = $1 AND user_id = $2`,
             [task_id, user_id]
         );
@@ -79,17 +46,52 @@ const deleteAssignedTask = async (req, res) => {
     }
 };
 
+//assign user to task
+
+const createTaskAssignment = async (req, res) => {
+    try {
+        const { task_id, user_id } = req.body;
+
+         const task = await TaskDb.oneOrNone('SELECT * FROM tasks WHERE id = $1', [task_id]);
+        if (!task) {
+            return res.status(404).json({ success: false, message: 'Task not found' });
+        }
+
+         const user = await TaskDb.oneOrNone('SELECT * FROM users WHERE id = $1', [user_id]);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+         const newAssignment = await TaskDb.one(
+            `INSERT INTO task_assignments (task_id, user_id) 
+            VALUES ($1, $2) RETURNING *`,
+            [task_id, user_id]
+        );
+
+        //creating default task_assignment_update for tracking 
+        const status = 'To Do';
+        await TaskDb.one(
+            `INSERT INTO task_status_updates (task_id, updated_by, status) 
+             VALUES ($1, $2, $3) RETURNING *`,
+            [task_id, user_id, status]
+        );
+
+        res.status(201).json({ success: true, message: 'Task assigned successfully', assignment: newAssignment });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error assigning task', error: error.message });
+    }
+};
 const updateAssignedTask = async (req, res) => {
     try {
         const { task_id, user_id } = req.params;
         const { new_user_id } = req.body; 
 
-        const task = await db.oneOrNone('SELECT * FROM tasks WHERE id = $1', [task_id]);
+        const task = await TaskDb.oneOrNone('SELECT * FROM tasks WHERE id = $1', [task_id]);
         if (!task) {
             return res.status(404).json({ success: false, message: 'Task not found' });
         }
 
-        const assignment = await db.oneOrNone(
+        const assignment = await TaskDb.oneOrNone(
             `SELECT * FROM task_assignments WHERE task_id = $1 AND user_id = $2`,
             [task_id, user_id]
         );
@@ -98,12 +100,12 @@ const updateAssignedTask = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Current assignment not found' });
         }
 
-         const user = await db.oneOrNone('SELECT * FROM users WHERE id = $1', [new_user_id]);
+         const user = await TaskDb.oneOrNone('SELECT * FROM users WHERE id = $1', [new_user_id]);
         if (!user) {
             return res.status(404).json({ success: false, message: 'New user not found' });
         }
 
-         const updatedAssignment = await db.one(
+         const updatedAssignment = await TaskDb.one(
             `UPDATE task_assignments SET user_id = $1 WHERE task_id = $2 AND user_id = $3 RETURNING *`,
             [new_user_id, task_id, user_id]
         );
@@ -118,7 +120,7 @@ const getUserAssignments = async (req, res) => {
     try {
         const { user_id } = req.params; 
 
-        const assignments = await db.any(
+        const assignments = await TaskDb.any(
             `SELECT t.id AS task_id, t.title, t.description, t.status, t.priority, t.deadline, t.estimated_hours, t.file_url, t.created_at, t.updated_at
             FROM task_assignments ta
             JOIN tasks t ON ta.task_id = t.id
@@ -136,39 +138,12 @@ const getUserAssignments = async (req, res) => {
     }
 };
 
-// this one for backwards compatibility
-const createTaskStatusUpdate = async (req, res) => {
-    try {
-        const { task_id, updated_by, status } = req.body;
-
-         const task = await db.oneOrNone('SELECT * FROM tasks WHERE id = $1', [task_id]);
-        if (!task) {
-            return res.status(404).json({ success: false, message: 'Task not found' });
-        }
-
-         const user = await db.oneOrNone('SELECT * FROM users WHERE id = $1', [updated_by]);
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
-
-         const newStatusUpdate = await db.one(
-            `INSERT INTO task_status_updates (task_id, updated_by, status) 
-            VALUES ($1, $2, $3) RETURNING *`,
-            [task_id, updated_by, status]
-        );
-
-        res.status(201).json({ success: true, message: 'Task status updated successfully', statusUpdate: newStatusUpdate });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error updating task status', error: error.message });
-    }
-};
-
 const editTaskStatusUpdate = async (req, res) => {
     try {
         const { status_update_id } = req.params; 
         const { status } = req.body; 
 
-         const existingStatusUpdate = await db.oneOrNone(
+         const existingStatusUpdate = await TaskDb.oneOrNone(
             'SELECT * FROM task_status_updates WHERE id = $1',
             [status_update_id]
         );
@@ -176,7 +151,7 @@ const editTaskStatusUpdate = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Status update not found' });
         }
 
-         const updatedStatus = await db.one(
+         const updatedStatus = await TaskDb.one(
             `UPDATE task_status_updates 
              SET status = $1, updated_at = CURRENT_TIMESTAMP
              WHERE id = $2 RETURNING *`,
@@ -197,7 +172,7 @@ const getUserTaskStatusUpdates = async (req, res) => {
     try {
         const { user_id } = req.params; 
 
-        const statusUpdates = await db.any(
+        const statusUpdates = await TaskDb.any(
             `SELECT tsu.*, 
                     t.title AS task_title, 
                     t.description AS task_description, 
@@ -224,7 +199,7 @@ const getUserTaskStatusUpdates = async (req, res) => {
 
 const getAllTaskStatusUpdates = async (req, res) => {
     try {
-        const statusUpdates = await db.any(
+        const statusUpdates = await TaskDb.any(
             `SELECT tsu.*, 
                     t.title AS task_title, 
                     t.description AS task_description, 
@@ -268,12 +243,12 @@ const submitTheTask = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid status value' });
         }
 
-        const task = await db.oneOrNone('SELECT * FROM tasks WHERE id = $1', [task_id]);
+        const task = await TaskDb.oneOrNone('SELECT * FROM tasks WHERE id = $1', [task_id]);
         if (!task) {
             return res.status(404).json({ success: false, message: 'Task not found' });
         }
 
-        const user = await db.oneOrNone('SELECT * FROM users WHERE id = $1', [updated_by]);
+        const user = await TaskDb.oneOrNone('SELECT * FROM users WHERE id = $1', [updated_by]);
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
@@ -298,7 +273,7 @@ const submitTheTask = async (req, res) => {
                             WHERE id = $3 RETURNING *`;
         const queryParams = [status, file_url, task_id];
 
-        const updatedTask = await db.one(updateQuery, queryParams);
+        const updatedTask = await TaskDb.one(updateQuery, queryParams);
 
          const updateStatusQuery = `
             UPDATE task_status_updates
@@ -307,7 +282,7 @@ const submitTheTask = async (req, res) => {
             RETURNING *;
         `;
         const statusUpdateParams = [status, updated_by, task_id];
-        const updatedStatus = await db.oneOrNone(updateStatusQuery, statusUpdateParams);
+        const updatedStatus = await TaskDb.oneOrNone(updateStatusQuery, statusUpdateParams);
 
         if (!updatedStatus) {
             return res.status(404).json({ success: false, message: 'No existing status update found for this task' });
@@ -330,7 +305,6 @@ module.exports = {
     deleteAssignedTask,
     updateAssignedTask,
     getUserAssignments,
-    createTaskStatusUpdate,
     editTaskStatusUpdate,
     getUserTaskStatusUpdates,
     getAllTaskStatusUpdates,

@@ -1,6 +1,7 @@
-const db = require('../Database/database.js');
 const fs = require("fs");
 const path = require("path");
+const TaskDb = require("../Database/TaskDb.js");
+
 
 const createTask = async (req, res) => {
     try {
@@ -8,7 +9,7 @@ const createTask = async (req, res) => {
 
         const file_url = req.file ? `${process.env.BASE_URL}/public/${req.file.filename}` : null;
 
-        const newTask = await db.one(
+        const newTask = await TaskDb.one(
             `INSERT INTO tasks (title, description, project_id, status, priority, deadline, estimated_hours, file_url) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
             [title, description, project_id, status || 'To Do', priority || 'Medium', deadline, estimated_hours, file_url]
@@ -22,7 +23,7 @@ const createTask = async (req, res) => {
 const getSingleTask = async (req, res) => {
     try {
         const { id } = req.params;
-        const task = await db.oneOrNone(
+        const task = await TaskDb.oneOrNone(
             `SELECT t.*, p.name AS project_name
             FROM tasks t
             LEFT JOIN projects p ON t.project_id = p.id
@@ -42,7 +43,7 @@ const getSingleTask = async (req, res) => {
 
 const getAllTasks = async (req, res) => {
     try {
-        const tasks = await db.any(
+        const tasks = await TaskDb.any(
             `SELECT t.*, p.name AS project_name
             FROM tasks t 
             LEFT JOIN projects p ON t.project_id = p.id`
@@ -53,11 +54,10 @@ const getAllTasks = async (req, res) => {
     }
 };
 
-
 const deleteTask = async (req, res) => {
     try {
         const { id } = req.params;
-        await db.none('DELETE FROM tasks WHERE id = $1', [id]);
+        await TaskDb.none('DELETE FROM tasks WHERE id = $1', [id]);
         res.status(200).json({ success: true, message: "Task deleted successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: "Error deleting task", error: error.message });
@@ -72,7 +72,7 @@ const getAllProjectTasks = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid project ID" });
         }
 
-        const tasks = await db.any(
+        const tasks = await TaskDb.any(
             `SELECT t.*, p.name AS project_name
             FROM tasks t
             LEFT JOIN projects p ON t.project_id = p.id
@@ -101,7 +101,7 @@ const updateTask = async (req, res) => {
             file_url = `${process.env.BASE_URL}/public/${req.file.filename}`;
         }
 
-         const currentTask = await db.oneOrNone(
+         const currentTask = await TaskDb.oneOrNone(
             `SELECT file_url FROM tasks WHERE id = $1`,
             [id]
         );
@@ -171,7 +171,7 @@ const updateTask = async (req, res) => {
         updateQuery += setClause.join(", ") + ` WHERE id = $${queryParams.length + 1} RETURNING *`;
         queryParams.push(id);
 
-        const updatedTask = await db.one(updateQuery, queryParams);
+        const updatedTask = await TaskDb.one(updateQuery, queryParams);
 
         res.status(200).json({
             success: true,
