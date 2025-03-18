@@ -89,6 +89,7 @@ const updateProject = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, description, deadline, status, priority, progress } = req.body;
+        
         let project_image = null;
 
         if (req.file) {
@@ -165,7 +166,6 @@ const updateProject = async (req, res) => {
         res.status(500).json({ success: false, message: "Error updating project", error: error.message });
     }
 };
-
 
 module.exports = {
     createProject,

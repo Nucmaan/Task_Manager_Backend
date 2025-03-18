@@ -58,11 +58,19 @@ CREATE TABLE task_status_updates (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 🔹 Task Comments Table (For discussions on tasks)
-CREATE TABLE task_comments (
+
+-- 🔹 project Comments/chat Table (For discussions on project)
+CREATE TABLE project_chat (
     id SERIAL PRIMARY KEY,
-    task_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    project_id INT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     comment TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+
+
+
+
+
+
