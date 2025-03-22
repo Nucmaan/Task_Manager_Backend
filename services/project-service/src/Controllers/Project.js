@@ -11,6 +11,8 @@ const createProject = async (req, res) => {
 
 const getAllProjects = async (req, res) => {
     try {
+        console.log("Request reached the project service");
+
         const projects = await ProjectService.getAllProjects();
         res.status(200).json({ success: true, projects });
     } catch (error) {

@@ -2,11 +2,17 @@ const UserService = require("../Services/UserService.js");
 
 const registerUser = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
-        const user = await UserService.registerUser(name, email, password);
-        res.status(201).json({ message: "User registered successfully", user });
+        const { name, email,mobile,password } = req.body;
+        
+         const user = await UserService.registerUser(name, email,mobile, password);
+
+         if (!user.success) {
+            return res.status(400).json({ success: false, message: user.message });
+        }
+
+         res.status(201).json({ message: "User registered successfully", user });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+         res.status(400).json({ success: false, message: error.message });
     }
 };
 
@@ -53,7 +59,7 @@ const deleteUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
     try {
-        await UserService.updateUser(req.params.id, req.body);
+        await UserService.updateUser(req.params.id, req.body, req.file);
         res.status(200).json({ message: "User updated successfully" });
     } catch (error) {
         res.status(400).json({ error: error.message });
