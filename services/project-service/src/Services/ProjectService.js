@@ -1,4 +1,3 @@
-const TaskDb = require("../Database/ProjectDb.js");
 const fs = require("fs");
 const path = require("path");
 const Project = require("../Model/Project.js");
@@ -180,15 +179,13 @@ const createProject = async (data, file) => {
         ? `${process.env.BASE_URL}/public/${file.filename}`
         : null;
   
-      // Fetch current project to check existing image
-      const currentProject = await Project.findOne({ where: { id } });
+       const currentProject = await Project.findOne({ where: { id } });
   
       if (!currentProject) {
         throw new Error("Project not found");
       }
   
-      // If there is a new image and the current project has an existing image, delete the old one
-      if (project_image && currentProject.project_image) {
+       if (project_image && currentProject.project_image) {
         const oldImagePath = path.join(
           __dirname,
           "..",
@@ -209,8 +206,7 @@ const createProject = async (data, file) => {
         });
       }
   
-      // Prepare the fields to update
-      const updatedFields = {
+       const updatedFields = {
         name: name || currentProject.name,
         description: description || currentProject.description,
         deadline: deadline || currentProject.deadline,
@@ -220,13 +216,11 @@ const createProject = async (data, file) => {
         project_image: project_image || currentProject.project_image,
       };
   
-      // Perform the update operation
-      await Project.update(updatedFields, {
+       await Project.update(updatedFields, {
         where: { id },
       });
   
-      // Fetch the updated project and return it
-      const updatedProject = await Project.findOne({ where: { id } });
+       const updatedProject = await Project.findOne({ where: { id } });
   
       return updatedProject;
   
