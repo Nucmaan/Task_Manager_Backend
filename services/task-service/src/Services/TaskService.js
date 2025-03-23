@@ -4,6 +4,8 @@ const path = require("path");
 const Task = require("../Model/TasksModel.js");
 const axios = require("axios");
 
+const redis = require("../utills/redis.js");
+
 const checkProjectExists = async (project_id) => {
     try {
         const response = await axios.get(`http://localhost:8002/api/project/singleProject/${project_id}`);
@@ -72,6 +74,9 @@ const createTask = async (taskData, file) => {
             file_url,
         });
 
+        await redis.del("all_tasks");
+        await redis.del(`project_tasks:${project_id}`);
+
         return { success: true, message: "Task created successfully", task: newTask };
     } catch (error) {
         console.error("Error creating task:", error.message);
@@ -84,6 +89,10 @@ const getSingleTask = async (id) => {
         if (!id) {
             return { success: false, message: "Invalid task ID" };
         }
+        const cachedTask = await redis.get(`task:${id}`);
+        if (cachedTask) {
+            return { success: true, task: JSON.parse(cachedTask) };
+        }
 
          const task = await Task.findOne({
             where: { id },
@@ -93,6 +102,7 @@ const getSingleTask = async (id) => {
         if (!task) {
             return { success: false, message: "Task not found" };
         }
+        await redis.setex(`task:${id}`, 3600, JSON.stringify(task));
 
          const projectCheck = await checkProjectExists(task.project_id);
 
@@ -122,9 +132,16 @@ const getSingleTask = async (id) => {
 
 const getAllTasks = async () => {
     try {
+
+        const cachedTasks = await redis.get("all_tasks");
+        if (cachedTasks) {
+            return { success: true, tasks: JSON.parse(cachedTasks) };
+        }
+
          const tasks = await Task.findAll({
             attributes: ['id', 'title', 'description', 'status', 'project_id', 'priority', 'deadline', 'estimated_hours', 'file_url', 'completed_at'], // Adjusted attributes
         });
+
 
          const tasksWithProjectDetails = await Promise.all(
             tasks.map(async (task) => {
@@ -144,6 +161,8 @@ const getAllTasks = async () => {
                 };
             })
         );
+
+        await redis.setex("all_tasks", 3600, JSON.stringify(tasksWithProjectDetails));
 
         return { success: true, tasks: tasksWithProjectDetails };
     } catch (error) {
@@ -166,6 +185,10 @@ const deleteTask = async (id) => {
 
          await task.destroy();
 
+         await redis.del("all_tasks");
+         await redis.del(`task:${id}`);
+         await redis.del(`project_tasks:${task.project_id}`);
+
         return { success: true, message: "Task deleted successfully" };
     } catch (error) {
         console.error("Error deleting task:", error.message);
@@ -177,6 +200,11 @@ const getAllProjectTasks = async (project_id) => {
     try {
         if (!project_id) {
             return { success: false, message: "Invalid project ID" };
+        }
+
+        const cachedTasks = await redis.get(`project_tasks:${project_id}`);
+        if (cachedTasks) {
+            return { success: true, tasks: JSON.parse(cachedTasks) };
         }
 
          const projectCheck = await checkProjectExists(project_id);
@@ -203,6 +231,7 @@ const getAllProjectTasks = async (project_id) => {
         if (tasks.length === 0) {
             return { success: false, message: "No tasks found for this project" };
         }
+        await redis.setex(`project_tasks:${project_id}`, 3600, JSON.stringify(tasks));
 
          return { success: true, project: projectCheck.project, tasks };
     } catch (error) {
@@ -259,6 +288,12 @@ const updateTask = async (id, taskData, file) => {
         }
 
          await Task.update(updatedData, { where: { id } });
+
+        await redis.del(`task:${id}`);
+        await redis.del("all_tasks");
+        if (project_id) {
+            await redis.del(`project_tasks:${project_id}`);
+        }
 
          const updatedTask = await Task.findOne({ where: { id } });
 

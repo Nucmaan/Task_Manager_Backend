@@ -5,6 +5,8 @@ const User = require("../../../user-service/src/model/User.js");
 const axios = require("axios");
 const { Op } = require('sequelize');
 
+const redis = require('../utills/redis.js');
+
 const getUserFromService = async (userId) => {
   try {
     const response = await axios.get(
@@ -65,7 +67,7 @@ const createProject = async (data, file) => {
 
     const project_image = file ? `${process.env.BASE_URL}/public/${file.filename}` : null;
 
-    return await Project.create({
+    const newProject = await Project.create({
       name,
       description,
       deadline: parsedDeadline,
@@ -75,15 +77,26 @@ const createProject = async (data, file) => {
       priority: priority || "Medium",
       progress: projectProgress || 0, 
     });
+
+    await redis.del('projects'); 
+
+    return newProject;
+
   } catch (error) {
     console.error("Error:", error.message);
     throw new Error(error.message);
   }
 };
 
-
   const getAllProjects = async () => {
     try {
+
+      const cachedProjects = await redis.get('projects');
+      if (cachedProjects) {
+        console.log('Returning cached projects from Redis');
+        return JSON.parse(cachedProjects);
+      }
+
       const projects = await Project.findAll({
         attributes: [
           'id', 'name', 'description', 'deadline', 'status', 'priority', 'progress', 'project_image', 'created_at', 'updated_at', 'created_by'
@@ -107,6 +120,7 @@ const createProject = async (data, file) => {
               creator_role: user.role,
               creator_profile_image: user.profile_image,
             };
+
           } catch (userError) {
             console.error("Error fetching user data:", userError.message);
             return {
@@ -120,6 +134,7 @@ const createProject = async (data, file) => {
           }
         })
       );
+      await redis.set('projects', JSON.stringify(projectsWithUserInfo)); 
       return projectsWithUserInfo;
     } catch (error) {
       console.error("Error fetching projects:", error.message);
@@ -129,6 +144,13 @@ const createProject = async (data, file) => {
 
   const getSingleProject = async (id) => {
     try {
+
+      const cachedProject = await redis.get(`project:${id}`);
+      if (cachedProject) {
+        console.log('Returning cached project from Redis');
+        return JSON.parse(cachedProject);
+      }
+
       const project = await Project.findOne({
         where: { id },
         attributes: [
@@ -146,7 +168,7 @@ const createProject = async (data, file) => {
         throw new Error("User not found");
       }
   
-      return {
+      const projectWithUserInfo = {
         ...project.toJSON(),
         creator_id: user.id,
         creator_name: user.name,
@@ -154,6 +176,8 @@ const createProject = async (data, file) => {
         creator_role: user.role,
         creator_profile_image: user.profile_image,
       };
+       await redis.set(`project:${id}`, JSON.stringify(projectWithUserInfo)); 
+      return projectWithUserInfo;
     } catch (error) {
       console.error("Error fetching single project with user:", error.message);
       throw new Error(error.message);
@@ -165,8 +189,12 @@ const createProject = async (data, file) => {
       const deletedCount = await Project.destroy({
         where: { id }, 
       });
+       if (deletedCount > 0) {
+         await redis.del(`project:${id}`);
+         await redis.del('projects');
+      }
   
-       return deletedCount > 0;
+      return deletedCount > 0;
     } catch (error) {
       console.error("Error deleting project:", error.message);
       throw new Error(error.message);
@@ -223,6 +251,9 @@ const createProject = async (data, file) => {
       });
   
        const updatedProject = await Project.findOne({ where: { id } });
+
+       await redis.del(`project:${id}`);
+       await redis.del('projects');
   
       return updatedProject;
   

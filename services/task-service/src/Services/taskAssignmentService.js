@@ -6,6 +6,7 @@ const TaskAssignment = require("../Model/task_assignments.js");
 const Task = require("../Model/TasksModel.js");
 const TaskStatusUpdate = require("../Model/task_status_updates.js");  
 const axios = require("axios");
+const redis = require("../utills/redis.js");
 
  const getUserFromService = async (userId) => {
     try {
@@ -237,8 +238,6 @@ const editStatusUpdate = async (statusUpdateId, status) => {
     throw error;
   }
 };
-
-
 
 
 
