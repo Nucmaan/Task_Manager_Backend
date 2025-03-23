@@ -1,9 +1,7 @@
 const { DataTypes } = require("sequelize");
-const projectInstance = require("../Database/index.js");
-const usersDb = require("../../../user-service/src/Database/index.js");
+const sequelize = require("../Database/index.js");
 
-
-const Project = projectInstance.define(
+const Project = sequelize.define(
   "Project",
   {
     id: {
@@ -31,16 +29,16 @@ const Project = projectInstance.define(
     },
     status: {
       type: DataTypes.STRING(20),
-      defaultValue: "Pending",
+      defaultValue: 'Pending',
       validate: {
-        isIn: [["Pending", "In Progress", "Completed"]],
+        isIn: [['Pending', 'In Progress', 'Completed']],
       },
     },
     priority: {
       type: DataTypes.STRING(20),
-      defaultValue: "Medium",
+      defaultValue: 'Medium',
       validate: {
-        isIn: [["Low", "Medium", "High", "Critical"]],
+        isIn: [['Low', 'Medium', 'High', 'Critical']],
       },
     },
     progress: {
@@ -62,21 +60,8 @@ const Project = projectInstance.define(
   },
   {
     tableName: "projects",
-    timestamps: false,
+    timestamps: false, 
   }
 );
-
-Project.prototype.getCreator = async function () {
-  try {
-    const user = await usersDb.query("SELECT * FROM users WHERE id = ?", {
-      replacements: [this.created_by],
-      type: usersDb.QueryTypes.SELECT,
-    });
-    return user[0]; 
-  } catch (error) {
-    console.error("Error fetching creator:", error);
-    return null; 
-  }
-};
 
 module.exports = Project;

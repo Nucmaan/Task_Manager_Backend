@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const app = require("./app.js");
-const sequelize = require("./Database/index.js");
+const sequelize = require("./Database/index.js");  
 
 const PORT = process.env.PORT;
 
@@ -17,8 +17,6 @@ sequelize.authenticate()
     console.error("Unable to connect to the database:", error);
   });
 
-
 app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
-
+  res.send('Hello World!');
+});

@@ -18,67 +18,69 @@ const getUserFromService = async (userId) => {
 };
 
 const createProject = async (data, file) => {
-    try {
-      const {
-        name,
-        description,
-        deadline,
-        created_by,
-        status,
-        priority,
-        progress,
-      } = data;
-  
-      if (!name || !description || !deadline || !created_by) {
-        throw new Error("Missing required fields: name, description, deadline, or created_by");
-      }
-  
-      if (isNaN(created_by)) {
-        throw new Error("Invalid user ID (created_by). It should be a number.");
-      }
-  
-      const parsedDeadline = new Date(deadline);
-      if (isNaN(parsedDeadline.getTime())) {
-        throw new Error("Invalid deadline. It should be a valid date.");
-      }
-  
-      const validStatuses = ["Pending", "In Progress", "Completed", "On Hold"];
-      if (status && !validStatuses.includes(status)) {
-        throw new Error(`Invalid status. Valid options are: ${validStatuses.join(", ")}`);
-      }
-  
-       const validPriorities = ["High", "Medium", "Low"];
-      if (priority && !validPriorities.includes(priority)) {
-        throw new Error(`Invalid priority. Valid options are: ${validPriorities.join(", ")}`);
-      }
-  
-       if (progress !== undefined && (typeof progress !== 'number' || progress < 0 || progress > 100)) {
-        throw new Error("Invalid progress. It should be a number between 0 and 100.");
-      }
-  
-       console.log("Creating project with user ID:", created_by);
-      const user = await getUserFromService(created_by); 
-      if (!user) {
-        throw new Error("User not found");
-      }
-  
-       const project_image = file ? `${process.env.BASE_URL}/public/${file.filename}` : null;
-  
-       return await Project.create({
-        name,
-        description,
-        deadline: parsedDeadline,
-        created_by,
-        status: status || "Pending",
-        project_image,
-        priority: priority || "Medium",
-        progress: progress || 0,
-      });
-    } catch (error) {
-      console.error("Error:", error.message);
-      throw new Error(error.message); 
+  try {
+    const {
+      name,
+      description,
+      deadline,
+      created_by,
+      status,
+      priority,
+      progress, 
+    } = data;
+
+    if (!name || !description || !deadline || !created_by) {
+      throw new Error("Missing required fields: name, description, deadline, or created_by");
     }
-  };
+
+    if (isNaN(created_by)) {
+      throw new Error("Invalid user ID (created_by). It should be a number.");
+    }
+
+    const parsedDeadline = new Date(deadline);
+    if (isNaN(parsedDeadline.getTime())) {
+      throw new Error("Invalid deadline. It should be a valid date.");
+    }
+
+    const validStatuses = ["Pending", "In Progress", "Completed", "On Hold"];
+    if (status && !validStatuses.includes(status)) {
+      throw new Error(`Invalid status. Valid options are: ${validStatuses.join(", ")}`);
+    }
+
+    const validPriorities = ["High", "Medium", "Low"];
+    if (priority && !validPriorities.includes(priority)) {
+      throw new Error(`Invalid priority. Valid options are: ${validPriorities.join(", ")}`);
+    }
+
+    let projectProgress = Number(progress);
+    if (progress !== undefined && (isNaN(projectProgress) || projectProgress < 0 || projectProgress > 100)) {
+      throw new Error("Invalid progress. It should be a number between 0 and 100.");
+    }
+
+    console.log("Creating project with user ID:", created_by);
+    const user = await getUserFromService(created_by);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const project_image = file ? `${process.env.BASE_URL}/public/${file.filename}` : null;
+
+    return await Project.create({
+      name,
+      description,
+      deadline: parsedDeadline,
+      created_by,
+      status: status || "Pending",
+      project_image,
+      priority: priority || "Medium",
+      progress: projectProgress || 0, 
+    });
+  } catch (error) {
+    console.error("Error:", error.message);
+    throw new Error(error.message);
+  }
+};
+
 
   const getAllProjects = async () => {
     try {

@@ -1,19 +1,25 @@
 require("dotenv").config();
 const { Sequelize } = require("sequelize");
 
-const sequelize = new Sequelize(process.env.tasks_db, process.env.DB_USER, process.env.DB_PASS, {
+const sequelize = new Sequelize(process.env.taskDb_Name, process.env.DB_USER, process.env.DB_PASS, {
   host: process.env.DB_HOST,
-  dialect: "postgres",
+  dialect: 'postgres',
   logging: false, 
 });
 
- (async () => {
-  try {
-    await sequelize.sync({ alter: true }); 
+sequelize
+  .authenticate()
+  .then(() => {
+    console.log("Database connection successful!");
+    return sequelize.sync({ force: false }); // Ensure tables are created
+  })
+  .then(() => {
     console.log("Tables synchronized successfully.");
-  } catch (error) {
-    console.error("Error syncing tables:", error);
-  }
-})();
+  })
+  .catch((error) => {
+    console.error("Unable to connect to the database:", error);
+  });
 
-module.exports = sequelize;
+
+  module.exports = sequelize;
+

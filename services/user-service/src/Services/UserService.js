@@ -3,8 +3,6 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const sendResetLink = require("../utills/sendEmail.js");
 const User = require("../model/User.js");
-const fs = require("fs");
-const path = require("path");
 
 const registerUser = async (name, email, password, mobile) => {
   try {
@@ -131,22 +129,14 @@ const updateUser = async (id, updateFields, file) => {
   if (!user) throw new Error("User not found");
 
   if (file) {
-    const oldImagePath = user.profile_image;
-    if (oldImagePath) {
-      const oldImageFilename = oldImagePath.split("/public/")[1];
-      const absoluteOldImagePath = path.join(
-        __dirname,
-        "../public",
-        oldImageFilename
-      );
-      fs.unlink(absoluteOldImagePath);
-      updateFields.profile_image = `/public/${file.filename}`;
-    }
+    updateFields.profile_image = `${process.env.BASE_URL}/public/${file.filename}`;
   }
+
   await user.update(updateFields);
 
   return user;
 };
+
 
 const forgetPassword = async (email) => {
   const user = await User.findOne({ where: { email } });

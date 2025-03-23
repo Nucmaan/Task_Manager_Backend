@@ -1,27 +1,5 @@
 const TaskAssignmentService = require("../Services/taskAssignmentService.js");
 
-const getSingleAssignedTask = async (req, res) => {
-    try {
-        const assignment = await TaskAssignmentService.getSingleAssignment(req.params.task_id, req.params.user_id);
-        assignment 
-            ? res.status(200).json({ success: true, assignment })
-            : res.status(404).json({ success: false, message: 'Assignment not found' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error fetching assignment', error: error.message });
-    }
-};
-
-const deleteAssignedTask = async (req, res) => {
-    try {
-        const isDeleted = await TaskAssignmentService.deleteAssignment(req.params.task_id, req.params.user_id);
-        isDeleted 
-            ? res.status(200).json({ success: true, message: 'Task assignment removed successfully' })
-            : res.status(404).json({ success: false, message: 'Assignment not found' });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Error deleting assignment', error: error.message });
-    }
-};
-
 const createTaskAssignment = async (req, res) => {
     try {
         const assignment = await TaskAssignmentService.createAssignment(req.body.task_id, req.body.user_id);
@@ -105,8 +83,6 @@ const submitTheTask = async (req, res) => {
 
 module.exports = {
     createTaskAssignment,
-    getSingleAssignedTask,
-    deleteAssignedTask,
     updateAssignedTask,
     getUserAssignments,
     editTaskStatusUpdate,

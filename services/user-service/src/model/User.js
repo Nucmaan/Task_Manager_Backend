@@ -1,8 +1,7 @@
 const { DataTypes } = require("sequelize");
-const sequelize = require("../Database/index.js"); // Import Sequelize instance
+const sequelize = require("../Database/index.js"); 
 
-// Define User model
-const User = sequelize.define(
+ const User = sequelize.define(
   "User",
   {
     id: {
@@ -59,7 +58,7 @@ const User = sequelize.define(
   },
   {
     tableName: "Users",
-    timestamps: false, // Disable automatic timestamp fields (createdAt, updatedAt)
+    timestamps: false,
   }
 );
 
