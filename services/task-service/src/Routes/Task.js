@@ -3,10 +3,10 @@ const { createTask, getSingleTask, getAllTasks, deleteTask, getAllProjectTasks, 
 const { upload } = require("../middleware/uploadMiddleware.js");
 const { authMiddleware, isLogin } = require('../middleware/authMiddleware.js');
 
-Router.post("/addTask",authMiddleware,upload.single("file_url"), createTask);
+Router.post("/addTask",upload.single("file_url"), createTask);
 Router.get("/singleTask/:id",isLogin, getSingleTask);
 Router.delete("/deleteSingleTask/:id",authMiddleware,deleteTask);
-Router.get("/allTasks", authMiddleware,getAllTasks);
+Router.get("/allTasks", getAllTasks);
 Router.put("/updateTask/:id",isLogin,upload.single("file_url"),updateTask);
 Router.get("/projectTasks/:project_id",authMiddleware,getAllProjectTasks);
 

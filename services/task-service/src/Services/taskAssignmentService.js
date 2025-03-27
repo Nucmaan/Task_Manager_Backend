@@ -70,35 +70,35 @@ const redis = require("../utills/redis.js");
 
   const getAllStatusUpdates = async () => {
     try {
-      const statusUpdates = await TaskStatusUpdate.findAll({
-        include: [
-          {
-            model: Task,
-            attributes: ["title", "description","status", "deadline", "priority"],
-          },
-        ],
-        order: [["updatedAt", "DESC"]],
-      });
-  
-      // Fetch user details for each update
-      const updatedStatus = await Promise.all(
-        statusUpdates.map(async (update) => {
-          const user = await getUserFromService(update.updated_by);
-          return {
-            ...update.toJSON(),
-            assigned_user: user ? user.name : "Unknown User",
-            profile_image: user ? user.profile_image : null,
-          };
-        })
-      );
-  
-      return updatedStatus;
-    } catch (error) {
-      console.error("Error fetching all status updates:", error.message);
-      throw error;
-    }
-  };
+        const statusUpdates = await TaskStatusUpdate.findAll({
+            include: [
+                {
+                    model: Task,
+                    attributes: ["title", "description", "status", "deadline", "priority"],
+                },
+            ],
+            order: [["updatedAt", "DESC"]],
+            raw: true,  // ✅ Ensure Sequelize returns plain objects
+        });
 
+        // Fetch user details for each update
+        const updatedStatus = await Promise.all(
+            statusUpdates.map(async (update) => {
+                const user = await getUserFromService(update.updated_by);
+                return {
+                    ...update,  // ✅ Now it includes `time_taken_in_hours`
+                    assigned_user: user ? user.name : "Unknown User",
+                    profile_image: user ? user.profile_image : null,
+                };
+            })
+        );
+
+        return updatedStatus;
+    } catch (error) {
+        console.error("Error fetching all status updates:", error.message);
+        throw error;
+    }
+};
 
   const getUserAssignments = async (userId) => {
     try {
@@ -141,15 +141,15 @@ const redis = require("../utills/redis.js");
     const allowedStatuses = ["To Do", "In Progress", "Review", "Completed"];
     if (!allowedStatuses.includes(status)) throw new Error("Invalid status");
 
-     const task = await Task.findByPk(taskId);
+    const task = await Task.findByPk(taskId);
     if (!task) throw new Error("Task not found");
 
-     const user = await getUserFromService(updatedBy);
+    const user = await getUserFromService(updatedBy);
     if (!user) throw new Error("User not found");
 
     const file_url = `${process.env.BASE_URL}/public/${file.filename}`;
 
-     if (task.file_url) {
+    if (task.file_url) {
         const oldFilePath = path.join(
             __dirname,
             "..",
@@ -161,27 +161,49 @@ const redis = require("../utills/redis.js");
         });
     }
 
-     await task.update({
+    await task.update({
         status: status,
         file_url: file_url,
         updatedAt: new Date(),
     });
 
-     let updatedStatus = await TaskStatusUpdate.findOne({ where: { task_id: taskId } });
+     let lastUpdate = await TaskStatusUpdate.findOne({
+        where: { task_id: taskId },
+        order: [["updated_at", "DESC"]], 
+    });
 
-    if (updatedStatus) {
-        await updatedStatus.update({
-            status: status,
-            updated_by: updatedBy,
-            updated_at: new Date(),
-        });
-    } else {
-        updatedStatus = await TaskStatusUpdate.create({
-            task_id: taskId,
-            updated_by: updatedBy,
-            status: status,
-        });
+    let timeTakenInHours = null;
+    let timeTakenInMinutes = null;
+
+    if (lastUpdate) {
+         const timeDifference = new Date() - new Date(lastUpdate.updated_at);
+
+         timeTakenInMinutes = Math.floor(timeDifference / (1000 * 60));
+        timeTakenInHours = Math.floor(timeTakenInMinutes / 60);
+        timeTakenInMinutes = timeTakenInMinutes % 60;
     }
+
+    let updatedStatus = await TaskStatusUpdate.create({
+        task_id: taskId,
+        updated_by: updatedBy,
+        status: status,
+        updated_at: new Date(),
+        time_taken_in_hours: timeTakenInHours, 
+        time_taken_in_minutes: timeTakenInMinutes, 
+    });
+
+
+     try {
+      await axios.post("http://localhost:8007/api/performance/track", {
+          userId: updatedBy,
+          timeTakenInMinutes: timeTakenInMinutes,
+          status: status,
+      });
+      console.log("Performance updated successfully");
+  } catch (error) {
+      console.error("Error updating performance:", error.response?.data || error.message);
+  }
+
 
     return {
         success: true,
@@ -214,7 +236,6 @@ const updateAssignment = async (taskId, oldUserId, newUserId) => {
   return { assignment, newStatusUpdate };
 };
 
-
 const editStatusUpdate = async (statusUpdateId, status) => {
   try {
      const allowedStatuses = ["To Do", "In Progress", "Review", "Completed"];
@@ -238,7 +259,6 @@ const editStatusUpdate = async (statusUpdateId, status) => {
     throw error;
   }
 };
-
 
 
 module.exports = {

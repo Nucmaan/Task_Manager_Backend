@@ -3,10 +3,10 @@ const { authMiddleware, isLogin } = require('../middleware/authMiddleware.js');
 const Router = require('express').Router();
 const { upload } = require('../middleware/uploadMiddleware.js'); 
 
-Router.post('/createProject',isLogin,upload.single('project_image'), createProject);
-Router.get('/allProjectList',authMiddleware,getAllProjects);
-Router.get('/singleProject/:id',isLogin,getSingleProject);
-Router.delete('/projectDelete/:id',isLogin,deleteProject);
-Router.put('/updateProject/:id',isLogin,upload.single('project_image'),updateProject);
+Router.post('/createProject',upload.single('project_image'), createProject);
+Router.get('/allProjectList',getAllProjects);
+Router.get('/singleProject/:id',getSingleProject);
+Router.delete('/projectDelete/:id',deleteProject);
+Router.put('/updateProject/:id',upload.single('project_image'),updateProject);
 
 module.exports = Router

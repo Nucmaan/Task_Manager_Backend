@@ -1,7 +1,6 @@
-const { DataTypes } = require("sequelize");
+const { DataTypes, Op } = require("sequelize");
 const sequelize = require("../Database/index.js");
 const Task = require("./TasksModel.js");
-const TaskAssignment = require("./task_assignments.js");
 
 const TaskStatusUpdate = sequelize.define("TaskStatusUpdate", {
   id: {
@@ -35,9 +34,16 @@ const TaskStatusUpdate = sequelize.define("TaskStatusUpdate", {
   },
   time_taken_in_hours: {
     type: DataTypes.DECIMAL(10, 2),
-    defaultValue: null,
+    defaultValue: null, 
   },
+  time_taken_in_minutes: {
+    type: DataTypes.INTEGER,
+    defaultValue: null, 
+  },
+}, {
+  timestamps: true, 
 });
+
 
 TaskStatusUpdate.belongsTo(Task, { foreignKey: "task_id", onDelete: "CASCADE" });
 Task.hasMany(TaskStatusUpdate, { foreignKey: "task_id" });
