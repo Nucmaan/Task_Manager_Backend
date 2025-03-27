@@ -22,7 +22,9 @@ app.use("/api/project", proxy("http://localhost:8002"));
 app.use("/api/auth", proxy("http://localhost:8001"));
 app.use("/api/task", proxy("http://localhost:8003"));
 app.use("/api/task-assignment", proxy("http://localhost:8003"));
-
+app.use("/api/notifications", proxy("http://localhost:8004"));
+app.use("/api/chat", proxy("http://localhost:8005"));
+app.use("/api/performance", proxy("http://localhost:8007"));
 
 app.listen(8000, () => {
   console.log("Gateway is Listening to Port 8000");
