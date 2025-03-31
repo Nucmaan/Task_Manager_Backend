@@ -1,6 +1,6 @@
 const { DataTypes, Op } = require("sequelize");
 const sequelize = require("../Database/index.js");
-const Task = require("./TasksModel.js");
+const Task = require("./subTask.js");
 
 const TaskStatusUpdate = sequelize.define("TaskStatusUpdate", {
   id: {

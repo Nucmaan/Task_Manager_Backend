@@ -1,4 +1,5 @@
 const UserService = require("../Services/UserService.js");
+const redis = require("../utills/redis.js");
 
 const registerUser = async (req, res) => {
     try {
@@ -19,11 +20,23 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
-        const { token, user } = await UserService.loginUser(email, password);
+        const { accessToken, refreshToken, user } = await UserService.loginUser(email, password);
+
+          await redis.set(`accessToken:${user.id}`, accessToken, "EX", 15 * 60);
+          await redis.set(`refreshToken:${user.id}`, refreshToken, "EX", 7 * 24 * 60 * 60);
 
         res.status(200)
-            .cookie("token", token, { expires: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), httpOnly: true })
-            .json({ message: "User logged in successfully", token, user });
+            .cookie("accessToken", accessToken, { 
+                httpOnly: true, 
+                sameSite: "Strict",
+                expires: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+            })
+            .cookie("refreshToken", refreshToken, { 
+                httpOnly: true, 
+                sameSite: "Strict", 
+                expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+            })
+            .json({ message: "User logged in successfully", user, accessToken,refreshToken});
 
     } catch (error) {
         res.status(401).json({ error: error.message });
@@ -86,7 +99,16 @@ const resetPassword = async (req, res) => {
 
 const logoutUser = async (req, res) => {
     try {
-        res.clearCookie("token", { httpOnly: true, sameSite: "strict" });
+        const userId = req.user?.id;
+
+        if (userId) {
+            await redis.del(`accessToken:${userId}`);
+            await redis.del(`refreshToken:${userId}`);
+        }
+
+        res.clearCookie("refreshToken"); 
+        res.clearCookie("accessToken"); 
+
         res.status(200).json({ message: "User logged out successfully" });
     } catch (error) {
         res.status(500).json({ error: "An error occurred while logging out" });

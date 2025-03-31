@@ -47,7 +47,7 @@ const Task = sequelize.define(
     },
   },
   {
-    timestamps: true, // Enable Sequelize's automatic timestamps (createdAt, updatedAt)
+    timestamps: true, 
   }
 );
 

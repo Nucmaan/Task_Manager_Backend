@@ -49,10 +49,12 @@ app.use("/public", express.static("public"));
 
 const taskRoutes = require("./Routes/Task.js");
 const taskAssignment = require("./Routes/Task_Assignments.js");
- 
+const subTaskRoutes = require("./Routes/Sub_Task.js");
+
 
 app.use("/api/task/", taskRoutes);
 app.use("/api/task-assignment/", taskAssignment);
- 
+app.use("/api/subtasks", subTaskRoutes);
+
 
 module.exports = app;

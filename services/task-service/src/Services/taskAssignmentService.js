@@ -3,8 +3,9 @@ const fs = require("fs");
 const path = require("path");
 
 const TaskAssignment = require("../Model/task_assignments.js");
-const Task = require("../Model/TasksModel.js");
-const TaskStatusUpdate = require("../Model/task_status_updates.js");  
+const Task = require("../Model/subTask.js");
+const TaskStatusUpdate = require("../Model/task_status_updates.js"); 
+const SubTask = require("../Model/subTask.js"); 
 const axios = require("axios");
 const redis = require("../utills/redis.js");
 
@@ -54,7 +55,6 @@ const redis = require("../utills/redis.js");
         include: [
           {
             model: Task,
-        attributes: ["title", "description", "deadline", "priority", "status", "createdAt"],
           },
         ],
         order: [["updated_at", "DESC"]],
@@ -74,19 +74,17 @@ const redis = require("../utills/redis.js");
             include: [
                 {
                     model: Task,
-                    attributes: ["title", "description", "status", "deadline", "priority"],
                 },
             ],
             order: [["updatedAt", "DESC"]],
-            raw: true,  // ✅ Ensure Sequelize returns plain objects
+            raw: true,  
         });
 
-        // Fetch user details for each update
         const updatedStatus = await Promise.all(
             statusUpdates.map(async (update) => {
                 const user = await getUserFromService(update.updated_by);
                 return {
-                    ...update,  // ✅ Now it includes `time_taken_in_hours`
+                    ...update, 
                     assigned_user: user ? user.name : "Unknown User",
                     profile_image: user ? user.profile_image : null,
                 };
@@ -102,7 +100,6 @@ const redis = require("../utills/redis.js");
 
   const getUserAssignments = async (userId) => {
     try {
-
         const user = await getUserFromService(userId);
       if (!user) throw new Error("User not found");
   
@@ -110,109 +107,96 @@ const redis = require("../utills/redis.js");
         where: { user_id: userId },
         include: [
           {
-            model: Task,
-            attributes: [
-              "id",
-              "title",
-              "description",
-              "status",
-              "priority",
-              "deadline",
-              "estimated_hours",
-              "file_url",
-              "createdAt",
-              "updatedAt",
-            ],
+            model: SubTask,
           },
         ],
       });
   
-      return assignments.map((assignment) => assignment.Task); 
+      return assignments.map((assignment) => assignment.SubTask); 
     } catch (error) {
       console.error("Error fetching user assignments:", error.message);
       throw error;
     }
   };
 
-  const submitTask = async (taskId, updatedBy, status, file) => {
-    if (!file) throw new Error("File is required");
-    if (!status) throw new Error("Status is required");
-
-    const allowedStatuses = ["To Do", "In Progress", "Review", "Completed"];
-    if (!allowedStatuses.includes(status)) throw new Error("Invalid status");
-
-    const task = await Task.findByPk(taskId);
-    if (!task) throw new Error("Task not found");
-
-    const user = await getUserFromService(updatedBy);
-    if (!user) throw new Error("User not found");
-
-    const file_url = `${process.env.BASE_URL}/public/${file.filename}`;
-
-    if (task.file_url) {
-        const oldFilePath = path.join(
-            __dirname,
-            "..",
-            "public",
-            task.file_url.replace(`${process.env.BASE_URL}/public/`, "")
-        );
-        fs.unlink(oldFilePath, (err) => {
-            if (err) console.error("Error deleting file:", err);
-        });
-    }
-
-    await task.update({
+  const submitTask = async (taskId, updatedBy, status, files) => {
+    try {
+      if (!files) throw new Error("File is required");
+      if (!status) throw new Error("Status is required");
+  
+      const allowedStatuses = ["To Do", "In Progress", "Review", "Completed"];
+      if (!allowedStatuses.includes(status)) throw new Error("Invalid status");
+  
+      const task = await SubTask.findByPk(taskId);
+      if (!task) throw new Error("Task not found");
+  
+      const user = await getUserFromService(updatedBy);
+      if (!user) throw new Error("User not found");
+  
+      let fileUrls = [];
+  
+      if (files && files.length > 0) {
+        fileUrls = files.map(file => `${process.env.BASE_URL}/public/${file.filename}`);
+      }
+  
+      let updatedData = {
         status: status,
-        file_url: file_url,
-        updatedAt: new Date(),
-    });
-
-     let lastUpdate = await TaskStatusUpdate.findOne({
+        file_url: fileUrls.length ? JSON.stringify(fileUrls) : task.file_url,  
+        updatedAt: new Date()
+      };
+  
+      await SubTask.update(updatedData, { where: { id: taskId } });
+  
+      let lastUpdate = await TaskStatusUpdate.findOne({
         where: { task_id: taskId },
-        order: [["updated_at", "DESC"]], 
-    });
-
-    let timeTakenInHours = null;
-    let timeTakenInMinutes = null;
-
-    if (lastUpdate) {
-         const timeDifference = new Date() - new Date(lastUpdate.updated_at);
-
-         timeTakenInMinutes = Math.floor(timeDifference / (1000 * 60));
+        order: [["updated_at", "DESC"]],
+      });
+  
+      let timeTakenInHours = null;
+      let timeTakenInMinutes = null;
+  
+      if (lastUpdate) {
+        const timeDifference = new Date() - new Date(lastUpdate.updated_at);
+  
+        timeTakenInMinutes = Math.floor(timeDifference / (1000 * 60));
         timeTakenInHours = Math.floor(timeTakenInMinutes / 60);
         timeTakenInMinutes = timeTakenInMinutes % 60;
-    }
-
-    let updatedStatus = await TaskStatusUpdate.create({
+      }
+  
+       let updatedStatus = await TaskStatusUpdate.create({
         task_id: taskId,
         updated_by: updatedBy,
         status: status,
         updated_at: new Date(),
-        time_taken_in_hours: timeTakenInHours, 
-        time_taken_in_minutes: timeTakenInMinutes, 
-    });
-
-
-     try {
-      await axios.post("http://localhost:8007/api/performance/track", {
+        time_taken_in_hours: timeTakenInHours,
+        time_taken_in_minutes: timeTakenInMinutes,
+      });
+  
+       try {
+        await axios.post("http://localhost:8007/api/performance/track", {
           userId: updatedBy,
           timeTakenInMinutes: timeTakenInMinutes,
           status: status,
-      });
-      console.log("Performance updated successfully");
-  } catch (error) {
-      console.error("Error updating performance:", error.response?.data || error.message);
-  }
-
-
-    return {
+        });
+      } catch (error) {
+        console.error("Error updating performance:", error.response?.data || error.message);
+      }
+  
+      return {
         success: true,
         message: "Task updated successfully",
         task,
         taskStatusUpdate: updatedStatus,
-    };
-};
-
+      };
+    } catch (error) {
+      console.error("Error submitting task:", error.message);
+      return {
+        success: false,
+        message: error.message,
+        error: error.stack,
+      };
+    }
+  };  
 
 const updateAssignment = async (taskId, oldUserId, newUserId) => {
 
@@ -259,7 +243,6 @@ const editStatusUpdate = async (statusUpdateId, status) => {
     throw error;
   }
 };
-
 
 module.exports = {
     createAssignment,

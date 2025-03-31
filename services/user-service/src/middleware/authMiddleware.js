@@ -1,67 +1,77 @@
 const jwt = require("jsonwebtoken");
 const { User } = require("../model/User.js");
+const redis = require("../utills/redis.js"); 
 
 const authMiddleware = async (req, res, next) => {
-  try {
-    const token = req.cookies.token; 
+    try {
+        let accessToken = req.cookies.accessToken;
 
-    if (!token) {
-      return res.status(401).json({ message: "No token, authorization denied" });
+        if (!accessToken && req.user?.id) {
+            accessToken = await redis.get(`accessToken:${req.user.id}`);
+        }
+
+        if (!accessToken) {
+            return res.status(401).json({ message: "No token, authorization denied" });
+        }
+
+        try {
+            const decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
+            req.user = { id: decoded.id, role: decoded.role };
+            return next();
+        } catch (error) {
+            if (error.name === "TokenExpiredError") {
+                return refreshTokenMiddleware(req, res, next);
+            }
+            return res.status(401).json({ message: "Invalid token" });
+        }
+    } catch (error) {
+        console.error("Auth Middleware Error:", error);
+        res.status(401).json({ message: "Authentication failed" });
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
-
-    const user = await User.findByPk(userId, {
-      attributes: ['id', 'role'] 
-    });
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    if (user.role !== "Admin") {
-      return res.status(403).json({ message: "Access denied: Insufficient permissions" });
-    }
-
-    req.user = { id: user.id, role: user.role }; 
-
-    next(); 
-  } catch (error) {
-    console.error("Auth Middleware Error:", error);
-    res.status(401).json({ message: "Token is not valid" });
-  }
 };
 
-const isLogin = async (req, res, next) => {
-  try {
-    const token = req.cookies.token; 
+const refreshTokenMiddleware = async (req, res, next) => {
+    try {
+        let refreshToken = req.cookies.refreshToken;
 
-    if (!token) {
-      return res.status(401).json({ message: "No token, authorization denied" });
+        if (!refreshToken && req.user?.id) {
+            refreshToken = await redis.get(`refreshToken:${req.user.id}`);
+        }
+
+        if (!refreshToken) {
+            return res.status(403).json({ message: "Refresh token required" });
+        }
+
+        const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
+        const user = await User.findByPk(decoded.id, { attributes: ["id", "role"] });
+
+        if (!user) {
+            return res.status(403).json({ message: "User not found" });
+        }
+
+        const newAccessToken = jwt.sign(
+            { id: user.id, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: "15m" }
+        );
+
+        await redis.set(`accessToken:${user.id}`, newAccessToken, "EX", 15 * 60);
+
+        res.cookie("accessToken", newAccessToken, { 
+            httpOnly: true, 
+            sameSite: "Strict",
+            expires: new Date(Date.now() + 15 * 60 * 1000), 
+        });
+
+        req.user = { id: user.id, role: user.role };
+        next();
+    } catch (error) {
+        console.error("Refresh Token Middleware Error:", error);
+        return res.status(403).json({ message: "Invalid refresh token, please login again" });
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id;
-
-    const user = await User.findByPk(userId, {
-      attributes: ['id', 'role']  
-    });
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    req.user = { id: user.id, role: user.role }; 
-
-    next(); 
-  } catch (error) {
-    console.error("Auth Middleware Error:", error);
-    res.status(401).json({ message: "Token is not valid" });
-  }
 };
 
 module.exports = {
-  authMiddleware, 
-  isLogin
+    authMiddleware,
+    refreshTokenMiddleware
 };
